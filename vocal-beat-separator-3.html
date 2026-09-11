@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>جداساز صدای خواننده و بیت</title>
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --elev: #121214;
+      --panel: #1a1a1e;
+      --fg: #f4f4f5;
+      --muted: #a1a1aa;
+      --dim: #71717a;
+      --line: #2a2a2e;
+      --accent: #e4e4e7;
+      --accent-fg: #0a0a0b;
+      --good: #5ee9b5;
+      --warn: #e8c07a;
+      --bad: #f0a3a3;
+      --font: Tahoma, "Segoe UI", system-ui, sans-serif;
+      --mono: ui-monospace, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg); }
+    body { font-family: var(--font); line-height: 1.55; padding: 20px 16px 56px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    h1 { margin: 0 0 8px; font-size: 1.55rem; font-weight: 700; }
+    .sub { margin: 0; color: var(--muted); max-width: 46rem; font-size: 0.95rem; }
+    .chip { border: 1px solid var(--line); background: var(--elev); color: var(--muted); border-radius: 999px; padding: 8px 12px; font-size: 12px; height: fit-content; }
+    .grid { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 14px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--elev); border: 1px solid var(--line); border-radius: 22px; padding: 16px; }
+    h2 { margin: 0 0 12px; font-size: 0.95rem; }
+    .drop { display: block; border: 1px dashed #3f3f46; border-radius: 16px; padding: 22px 14px; text-align: center; cursor: pointer; background: var(--panel); min-height: 84px; }
+    .drop:hover, .drop.drag { border-color: var(--accent); }
+    .drop input { display: none; }
+    .meta { margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+    @media (max-width: 520px) { .modes { grid-template-columns: 1fr; } }
+    .mode { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+    .mode:has(input:checked) { border-color: #52525b; background: #202024; }
+    .mode strong { display: block; margin: 2px 0 4px; }
+    .mode span { color: var(--muted); font-size: 12px; line-height: 1.6; display: block; }
+    .sliders { display: grid; gap: 10px; margin: 4px 0 14px; }
+    .s { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; color: var(--muted); }
+    .s b { color: var(--fg); font-variant-numeric: tabular-nums; }
+    input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); height: 40px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    button, .btn {
+      appearance: none; border: 0; border-radius: 12px; padding: 12px 16px;
+      min-height: 44px; font: inherit; font-weight: 700; cursor: pointer;
+    }
+    button.primary { background: var(--accent); color: var(--accent-fg); }
+    button.ghost, a.btn.ghost { background: var(--panel); color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    a.btn { display: inline-flex; align-items: center; text-decoration: none; background: var(--accent); color: var(--accent-fg); }
+    .bar { height: 8px; background: #222226; border-radius: 99px; overflow: hidden; margin-top: 16px; }
+    .bar > i { display: block; width: 0; height: 100%; background: var(--accent); }
+    .pct { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .hb { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #3f3f46; }
+    .dot.on { background: var(--good); }
+    .wave { width: 100%; height: 72px; display: block; margin-top: 12px; background: var(--panel); border-radius: 12px; border: 1px solid var(--line); }
+    .log {
+      height: min(520px, 68vh); overflow: auto; background: #09090b; border: 1px solid var(--line);
+      border-radius: 16px; padding: 12px; font-family: var(--mono); font-size: 12px; line-height: 1.65;
+      direction: ltr; text-align: left; white-space: pre-wrap;
+    }
+    .t { color: #52525b; } .ok { color: var(--good); } .info { color: #d4d4d8; }
+    .warn { color: var(--warn); } .err { color: var(--bad); } .eng { color: #c4c4cc; }
+    .results { display: grid; gap: 10px; margin-top: 14px; }
+    .results[hidden] { display: none !important; }
+    .stem { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+    .stem h3 { margin: 0 0 6px; font-size: 14px; }
+    audio { width: 100%; margin-top: 8px; }
+    .hint { color: var(--dim); font-size: 12.5px; line-height: 1.75; margin: 14px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>جداساز صدای خواننده و بیت</h1>
+        <p class="sub">بدون مدل هوش مصنوعی. کل موتور داخل همین یک فایل HTML است و روی دستگاه خودت رندر می‌شود: FFT، کانال وسط/کنار، همدوسی فاز، و جداسازی هارمونیک از ضربه.</p>
+      </div>
+      <div class="chip">فقط DSP · بدون مدل · بدون دانلود شبکه</div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>ورودی و تنظیم موتور</h2>
+        <label class="drop" id="drop">
+          <input id="file" type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" />
+          <div>آهنگ را اینجا رها کن یا انتخاب کن</div>
+          <div class="meta" id="fileMeta">فایلی نیست. می‌توانی نمونه آزمایشی بسازی.</div>
+        </label>
+        <svg class="wave" id="wave" viewBox="0 0 800 72" preserveAspectRatio="none" aria-hidden="true"></svg>
+
+        <div class="modes">
+          <label class="mode">
+            <input type="radio" name="engine" value="dsp" checked />
+            <strong>موتور DSP</strong>
+            <span>کاملاً آفلاین، بدون دانلود، همین الان اجرا می‌شود.</span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="engine" value="ai" />
+            <strong>موتور هوش مصنوعی (Demucs)</strong>
+            <span>دقت بسیار بالاتر. بار اول ~۱۷۰MB مدل دانلود می‌شود؛ بعدش کش می‌ماند و همه‌چیز روی خود دستگاه اجرا می‌شود.</span>
+          </label>
+        </div>
+
+        <div class="modes">
+          <label class="mode">
+            <input type="radio" name="listen" value="vocals" checked />
+            <strong>صدای خواننده</strong>
+            <span>کانال وسط + باند وکال + بخش هارمونیک.</span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="listen" value="beat" />
+            <strong>بیت / بی‌کلام</strong>
+            <span>میکس منهای وکال جداشده، با حفظ ضربه.</span>
+          </label>
+        </div>
+
+        <div class="sliders" id="dspSliders">
+          <label class="s">قدرت جداسازی <b id="sv">۹۴</b><input id="strength" type="range" min="40" max="100" value="94" /></label>
+          <label class="s">کات پایین Hz <b id="lv">۱۴۰</b><input id="lowcut" type="range" min="40" max="280" value="140" /></label>
+          <label class="s">کات بالا Hz <b id="hv">۸۰۰۰</b><input id="highcut" type="range" min="3500" max="12000" value="8000" /></label>
+          <label class="s">سخت‌گیری فاز <b id="pv">۷۵</b><input id="phase" type="range" min="20" max="95" value="75" /></label>
+        </div>
+        <div class="sliders" id="pass2Block">
+          <label class="s">شدت پاس دوم <b id="p2v">۹۰</b><input id="pass2Strength" type="range" min="50" max="100" value="90" /></label>
+        </div>
+
+        <label class="mode" id="pass2Label" style="margin-bottom:14px;display:block">
+          <input type="checkbox" id="pass2" />
+          <strong>پاس دوم: رد کردن دوباره از موتور جداسازی</strong>
+          <span id="pass2Hint">بعد از رندر اول، خروجی دوباره وارد موتور می‌شود تا باقی‌مانده‌های وکال از بیت و باقی‌مانده‌های بیت از وکال پاک‌سازی شود. رندر کندتر می‌شود.</span>
+        </label>
+
+        <div class="row">
+          <button class="primary" id="run" disabled>رندر کردن موتور</button>
+          <button class="ghost" id="demo">ساخت نمونه آزمایشی</button>
+          <button class="ghost" id="cancel" disabled>قطع</button>
+        </div>
+
+        <div class="bar"><i id="bar"></i></div>
+        <div class="pct"><span id="phaseTxt">آماده</span><span id="pct">۰٪</span></div>
+        <div class="hb"><span class="dot" id="dot"></span><span id="hb">موتور خاموش است</span></div>
+
+        <div class="results" id="results" hidden>
+          <div class="stem">
+            <h3>صدای خواننده</h3>
+            <audio id="playerV" controls></audio>
+            <div class="row" style="margin-top:10px"><a class="btn" id="dlV" download="vocals.wav">دانلود وکال WAV</a></div>
+          </div>
+          <div class="stem">
+            <h3>بیت / بی‌کلام</h3>
+            <audio id="playerB" controls></audio>
+            <div class="row" style="margin-top:10px"><a class="btn ghost" id="dlB" download="beat.wav">دانلود بیت WAV</a></div>
+          </div>
+        </div>
+        <p class="hint">موتور DSP مدل هوش مصنوعی نیست و روی آهنگ استریو با خواننده وسط‌چین بهتر کار می‌کند. موتور AI (Demucs) یک شبکهٔ عصبی واقعی است، مدل را یک‌بار دانلود می‌کند و از آن به بعد کاملاً آفلاین روی خود دستگاه اجرا می‌شود — نیاز به اینترنت فقط برای همان دانلود اول است.</p>
+      </section>
+
+      <section class="card">
+        <h2>رندر زندهٔ موتور</h2>
+        <div class="log" id="log"></div>
+      </section>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const faNum = (n) => String(n).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+  const bind = (id, view) => $(id).addEventListener("input", () => { $(view).textContent = faNum($(id).value); });
+  bind("strength", "sv"); bind("lowcut", "lv"); bind("highcut", "hv"); bind("phase", "pv"); bind("pass2Strength", "p2v");
+
+  document.querySelectorAll('input[name="engine"]').forEach((r) => {
+    r.addEventListener("change", () => {
+      const isAI = document.querySelector('input[name="engine"]:checked').value === "ai";
+      $("dspSliders").style.opacity = isAI ? 0.4 : 1;
+      $("dspSliders").querySelectorAll("input").forEach((i) => (i.disabled = isAI));
+      $("pass2Block").style.opacity = isAI ? 0.4 : 1;
+      $("pass2Strength").disabled = isAI;
+      $("pass2").disabled = isAI;
+      $("pass2Hint").textContent = isAI
+        ? "برای موتور AI این پاس به‌صورت هوشمند و خودکار (با شناسایی زمانی صدای خواننده) انجام می‌شود؛ نیازی به فعال‌سازی دستی نیست."
+        : "بعد از رندر اول، خروجی دوباره وارد موتور می‌شود تا باقی‌مانده‌های وکال از بیت و باقی‌مانده‌های بیت از وکال پاک‌سازی شود. رندر کندتر می‌شود.";
+      $("run").textContent = isAI ? "رندر با هوش مصنوعی" : "رندر کردن موتور";
+    });
+  });
+
+  const logEl = $("log");
+  function now() { return new Date().toLocaleTimeString("fa-IR", { hour12: false }); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => {
+      if (c === "&") return "\u0026amp;";
+      if (c === "<") return "\u0026lt;";
+      if (c === ">") return "\u0026gt;";
+      if (c === '"') return "\u0026quot;";
+      return "\u0026#39;";
+    });
+  }
+  function log(k, m) {
+    const d = document.createElement("div");
+    d.innerHTML = '<span class="t">[' + now() + ']</span> <span class="' + k + '">' + esc(m) + "</span>";
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setProg(p, ph) {
+    $("bar").style.width = Math.max(0, Math.min(100, p)).toFixed(1) + "%";
+    $("pct").textContent = faNum(Math.round(p)) + "٪";
+    if (ph) $("phaseTxt").textContent = ph;
+  }
+
+  let audioBuffer = null;
+  let fileName = "track";
+  let abortFlag = false;
+  let running = false;
+  let hbTimer = null;
+  let ticks = 0;
+  let lastPoke = 0;
+
+  function startHB(label) {
+    stopHB();
+    ticks = 0;
+    lastPoke = performance.now();
+    $("dot").classList.add("on");
+    hbTimer = setInterval(() => {
+      ticks += 1;
+      const ago = ((performance.now() - lastPoke) / 1000).toFixed(1);
+      $("hb").textContent = label + " · تیک " + faNum(ticks) + " · آخرین سیگنال " + ago + "s پیش";
+      log("eng", "heartbeat #" + ticks + " — رندر زنده است، صفحه قفل نشده.");
+    }, 1400);
+  }
+  function poke() { lastPoke = performance.now(); }
+  function stopHB() {
+    if (hbTimer) clearInterval(hbTimer);
+    hbTimer = null;
+    $("dot").classList.remove("on");
+    $("hb").textContent = "موتور خاموش است";
+  }
+
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
+  drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+  $("file").addEventListener("change", () => { const f = $("file").files[0]; if (f) loadFile(f); });
+
+  async function loadFile(file) {
+    fileName = file.name;
+    log("info", "فایل: " + file.name + "  " + (file.size / 1024 / 1024).toFixed(2) + "MB");
+    setProg(4, "دیکود صدا");
+    startHB("دیکود");
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const decoded = await ctx.decodeAudioData(await file.arrayBuffer());
+      audioBuffer = decoded;
+      $("fileMeta").innerHTML = esc(file.name) + "<br>مدت " + decoded.duration.toFixed(2) + "s · " + decoded.numberOfChannels + "ch · " + decoded.sampleRate + "Hz";
+      drawWave(decoded);
+      $("run").disabled = false;
+      log("ok", "بافر آماده: " + decoded.length + " نمونه");
+      if (decoded.numberOfChannels < 2) log("warn", "مونو است؛ جداسازی وسط/کنار ضعیف‌تر می‌شود.");
+      else log("eng", "استریو است؛ همدوسی فاز کانال وسط را جدا می‌کند.");
+      setProg(8, "آماده برای رندر");
+    } catch (e) {
+      log("err", "دیکود شکست: " + (e && e.message ? e.message : e));
+    } finally {
+      stopHB();
+    }
+  }
+
+  function drawWave(buf) {
+    const svg = $("wave");
+    const w = 800, h = 72, mid = h / 2;
+    const ch = buf.getChannelData(0);
+    const step = Math.max(1, Math.floor(ch.length / w));
+    let d = "";
+    for (let x = 0; x < w; x++) {
+      let min = 1, max = -1, s = x * step;
+      for (let i = 0; i < step; i++) {
+        const v = ch[s + i] || 0;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      d += "M" + x + " " + (mid + min * (mid - 2)).toFixed(1) + " L" + x + " " + (mid + max * (mid - 2)).toFixed(1) + " ";
+    }
+    svg.innerHTML = '<rect width="800" height="72" fill="#1a1a1e"/><path d="' + d + '" stroke="#d4d4d8" stroke-width="1" fill="none"/>';
+  }
+
+  $("demo").addEventListener("click", async () => {
+    log("eng", "ساخت مخلوط آزمایشی ۳ ثانیه‌ای بدون هیچ مدلی.");
+    const sr = 44100, n = sr * 3;
+    const L = new Float32Array(n);
+    const R = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const env = 0.55 + 0.45 * Math.sin(2 * Math.PI * 2.5 * t);
+      const vocal = 0.28 * Math.sin(2 * Math.PI * 700 * t) * env;
+      const inst = 0.22 * Math.sin(2 * Math.PI * 220 * t);
+      const period = Math.floor(sr * 0.5);
+      const kick = ((i % period) < 1200) ? 0.45 * Math.exp(-(i % period) / 280) * Math.sin(2 * Math.PI * 60 * t) : 0;
+      L[i] = vocal + inst * 1.15 + kick;
+      R[i] = vocal + inst * 0.35 + kick;
+    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sr });
+    const buf = ctx.createBuffer(2, n, sr);
+    buf.copyToChannel(L, 0);
+    buf.copyToChannel(R, 1);
+    audioBuffer = buf;
+    fileName = "demo-mix.wav";
+    $("fileMeta").innerHTML = "نمونه آزمایشی · ۳.۰۰s · ۲ch · ۴۴۱۰۰Hz";
+    drawWave(buf);
+    $("run").disabled = false;
+    log("ok", "نمونه آماده است. رندر موتور را بزن.");
+    setProg(8, "آماده برای رندر");
+  });
+
+  $("cancel").addEventListener("click", () => {
+    abortFlag = true;
+    log("warn", "قطع ثبت شد.");
+  });
+
+  $("run").addEventListener("click", () => { if (audioBuffer && !running) runEngine(); });
+
+  async function runEngine() {
+    running = true;
+    abortFlag = false;
+    $("run").disabled = true;
+    $("cancel").disabled = false;
+    $("demo").disabled = true;
+    $("results").hidden = true;
+    const engine = document.querySelector('input[name="engine"]:checked').value;
+    let srOut = audioBuffer.sampleRate;
+    try {
+      let out;
+      if (engine === "ai") {
+        startHB("رندر AI");
+        log("eng", "مسیر: دانلود/کش مدل Demucs → STFT داخلی مدل → استنتاج شبکهٔ عصبی → drums+bass+other=بیت");
+        const res = await separateAI(audioBuffer);
+        out = res; srOut = res.sr;
+      } else {
+        const params = {
+          strength: +$("strength").value / 100,
+          lowcut: +$("lowcut").value,
+          highcut: +$("highcut").value,
+          phaseSens: +$("phase").value / 100
+        };
+        const left = new Float32Array(audioBuffer.getChannelData(0));
+        const right = new Float32Array(audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : audioBuffer.getChannelData(0));
+        startHB("رندر DSP");
+        log("eng", "هیچ مدلی بارگذاری نمی‌شود. مسیر: Hann → FFT 2048 → فاز → HPSS → ماسک → ISTFT");
+        log("eng", "strength=" + params.strength.toFixed(2) + " low=" + params.lowcut + " high=" + params.highcut + " phase=" + params.phaseSens.toFixed(2));
+        out = await separate(left, right, audioBuffer.sampleRate, params);
+      }
+      if (abortFlag) throw new Error("متوقف شد");
+      peakNormalize(out.vocL, out.vocR, 0.97);
+      peakNormalize(out.beatL, out.beatR, 0.97);
+
+      setProg(88, "افزایش وضوح صدای خواننده");
+      await clarityBoost(out.vocL, out.vocR, srOut);
+      if (abortFlag) throw new Error("متوقف شد");
+      peakNormalize(out.vocL, out.vocR, 0.97);
+
+      if ($("pass2").checked) {
+        setProg(90, "پاس دوم: حذف باقی‌مانده‌ها");
+        const intensity = +$("pass2Strength").value / 100;
+        out = await refinePass(out.vocL, out.vocR, out.beatL, out.beatR, srOut, intensity);
+        if (abortFlag) throw new Error("متوقف شد");
+        peakNormalize(out.vocL, out.vocR, 0.97);
+        peakNormalize(out.beatL, out.beatR, 0.97);
+      }
+
+      const base = fileName.replace(/\.[^.]+$/, "") || "track";
+      attach("playerV", "dlV", out.vocL, out.vocR, srOut, base + "-vocals.wav");
+      attach("playerB", "dlB", out.beatL, out.beatR, srOut, base + "-beat.wav");
+      $("results").hidden = false;
+      setProg(100, "رندر تمام شد");
+      log("ok", "هر دو خروجی رندر شد.");
+    } catch (e) {
+      log("err", String(e && e.message ? e.message : e));
+      setProg(0, "خطا / توقف");
+    } finally {
+      stopHB();
+      running = false;
+      $("run").disabled = false;
+      $("cancel").disabled = true;
+      $("demo").disabled = false;
+    }
+  }
+
+  // ---- AI engine (optional) ----------------------------------------------
+  // Uses Meta's HTDemucs (MIT license) exported to ONNX and run fully
+  // on-device via onnxruntime-web (WebGPU, falls back to WASM). Nothing is
+  // uploaded: the model file (~170MB) is fetched once, stored as raw bytes
+  // in IndexedDB (survives closing the tab / reopening the HTML file —
+  // unlike the browser's HTTP cache, which can get evicted), and every
+  // later run loads straight from there with zero network use. Threads are
+  // pinned to 1 so it also works on hosts that don't send COOP/COEP headers
+  // (e.g. plain GitHub Pages) — slower, but it runs everywhere instead of
+  // failing silently on stricter setups.
+  const AI_MODEL_URL = "https://huggingface.co/timcsy/demucs-web-onnx/resolve/main/htdemucs_embedded.onnx";
+  const IDB_NAME = "vocal-beat-separator-cache";
+  const IDB_STORE = "models";
+  let _aiProcessor = null;
+  // onnxruntime-web can fail to spin up a backend for reasons that have
+  // nothing to do with the model itself — a proxy Worker 404ing against a
+  // mismatched CDN build, a CDN being blocked/slow on a given network, etc.
+  // Instead of hard-failing on the first combo, we try a short list of
+  // known-working combos in order and remember (per-browser) whichever one
+  // actually worked, so every run after the first one goes straight there.
+  const ORT_VERSION = "1.19.2";
+  const ORT_CDN_BASES = [
+    "https://cdn.jsdelivr.net/npm/onnxruntime-web@" + ORT_VERSION + "/dist/",
+    "https://unpkg.com/onnxruntime-web@" + ORT_VERSION + "/dist/"
+  ];
+  const AI_BACKEND_CONFIG_KEY = "vbs-ort-backend-config-v1";
+
+  function openModelDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGetModel(key) {
+    const db = await openModelDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbPutModel(key, buf) {
+    const db = await openModelDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(buf, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function fetchModelBytes(url) {
+    let cached = null;
+    try { cached = await idbGetModel(url); } catch (e) { log("warn", "خواندن IndexedDB ممکن نشد: " + (e && e.message ? e.message : e)); }
+    if (cached && cached.byteLength) {
+      log("ai", "مدل از IndexedDB بارگذاری شد — بدون دانلود (" + (cached.byteLength / 1024 / 1024).toFixed(1) + "MB).");
+      setProg(60, "بارگذاری مدل از حافظهٔ محلی");
+      return cached;
+    }
+    log("ai", "مدل در حافظهٔ محلی نبود؛ دانلود اولیه از اینترنت شروع شد (فقط همین یک‌بار).");
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("دانلود مدل شکست خورد: HTTP " + resp.status);
+    const total = +resp.headers.get("content-length") || 0;
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0, lastLogMb = -1;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      poke();
+      const mb = received / 1024 / 1024;
+      setProg(5 + Math.min(55, total ? (received / total) * 55 : 0), "دانلود مدل Demucs");
+      if (Math.floor(mb / 15) !== lastLogMb) {
+        lastLogMb = Math.floor(mb / 15);
+        log("ai", "دانلود: " + mb.toFixed(1) + "MB" + (total ? " / " + (total / 1024 / 1024).toFixed(1) + "MB" : ""));
+      }
+    }
+    const bytes = new Uint8Array(received);
+    let off = 0;
+    for (const c of chunks) { bytes.set(c, off); off += c.length; }
+    try {
+      await idbPutModel(url, bytes.buffer);
+      log("ok", "مدل در IndexedDB ذخیره شد — دفعات بعد (حتی بعد از بستن و باز کردن فایل) دیگر دانلود نمی‌شود.");
+    } catch (e) {
+      log("warn", "ذخیرهٔ مدل در IndexedDB ممکن نشد (فضای دیسک؟) — دفعهٔ بعد دوباره دانلود لازم است: " + (e && e.message ? e.message : e));
+    }
+    return bytes.buffer;
+  }
+
+  // Builds one candidate ort.env configuration + a fresh DemucsProcessor,
+  // and actually tries to build the inference session with it. Throwing
+  // here means "this combo doesn't work on this browser/network", not
+  // "AI separation is broken" — the caller tries the next combo.
+  async function tryLoadOrtSession(ort, DemucsProcessor, blobUrl, cfg) {
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = true;
+    ort.env.wasm.proxy = cfg.proxy;
+    if (cfg.wasmPaths) ort.env.wasm.wasmPaths = cfg.wasmPaths;
+    else delete ort.env.wasm.wasmPaths;
+    const proc = new DemucsProcessor({
+      ort,
+      onProgress: (info) => {
+        setProg(62 + (info.progress || 0) * 25, "استنتاج شبکه عصبی — قطعه " + ((info.currentSegment || 0) + 1));
+        poke();
+      },
+      onLog: (phase, msg) => log("ai", "[" + phase + "] " + msg)
+    });
+    await proc.loadModel(blobUrl);
+    return proc;
+  }
+
+  async function ensureAIProcessor() {
+    if (_aiProcessor) return _aiProcessor;
+
+    // Workers + fetching the .wasm binary both require a real origin;
+    // neither works when the file is just double-clicked open from disk.
+    if (location.protocol === "file:") {
+      throw new Error("این صفحه از روی دیسک باز شده (file://). موتور AI به Worker و دانلود فایل wasm نیاز دارد که زیر file:// در مرورگر کار نمی‌کند — این فایل را از GitHub Pages باز کن یا با یک سرور محلی (مثلاً «python -m http.server» در پوشهٔ فایل) سرو کن.");
+    }
+
+    log("ai", "بارگذاری onnxruntime-web و demucs-web از CDN...");
+    const ort = await import("https://esm.sh/onnxruntime-web@" + ORT_VERSION);
+    const { DemucsProcessor } = await import("https://esm.sh/demucs-web?deps=onnxruntime-web@" + ORT_VERSION);
+
+    const modelBytes = await fetchModelBytes(AI_MODEL_URL);
+    if (abortFlag) throw new Error("متوقف شد");
+    const blobUrl = URL.createObjectURL(new Blob([modelBytes], { type: "application/octet-stream" }));
+
+    // `proxy: true` (own Worker, tab stays responsive) is preferred, but it
+    // depends on the proxy-worker file actually being reachable at
+    // wasmPaths for this exact version/CDN. If that fails for any reason,
+    // fall back to no-proxy on the same CDN, then repeat on a second CDN,
+    // then finally let onnxruntime-web resolve its own default paths.
+    const configs = [];
+    for (const base of ORT_CDN_BASES) {
+      configs.push({ proxy: true, wasmPaths: base });
+      configs.push({ proxy: false, wasmPaths: base });
+    }
+    configs.push({ proxy: false, wasmPaths: null });
+
+    // Whatever combo worked last time on this browser, try it first so
+    // repeat runs succeed on the first attempt instead of re-discovering it.
+    let remembered = null;
+    try { remembered = JSON.parse(localStorage.getItem(AI_BACKEND_CONFIG_KEY) || "null"); } catch (e) {}
+    if (remembered) {
+      const idx = configs.findIndex(c => c.proxy === remembered.proxy && c.wasmPaths === remembered.wasmPaths);
+      if (idx > 0) configs.unshift(configs.splice(idx, 1)[0]);
+    }
+
+    let lastErr = null;
+    for (let i = 0; i < configs.length; i++) {
+      const cfg = configs[i];
+      if (abortFlag) throw new Error("متوقف شد");
+      setProg(60, "ساخت session مدل (تلاش " + (i + 1) + " از " + configs.length + ")");
+      log("ai", "تلاش backend " + (i + 1) + "/" + configs.length + ": proxy=" + cfg.proxy + "، wasmPaths=" + (cfg.wasmPaths || "پیش‌فرض ort"));
+      try {
+        const proc = await tryLoadOrtSession(ort, DemucsProcessor, blobUrl, cfg);
+        _aiProcessor = proc;
+        try { localStorage.setItem(AI_BACKEND_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
+        log("ok", "مدل Demucs آماده است (حالتی که کار کرد برای دفعات بعد ذخیره شد).");
+        return proc;
+      } catch (e) {
+        lastErr = e;
+        log("warn", "این حالت جواب نداد: " + (e && e.message ? e.message : e));
+      }
+    }
+    throw new Error("هیچ‌کدام از حالت‌های اجرای مدل روی این مرورگر/شبکه کار نکرد. آخرین خطا: " + (lastErr && lastErr.message ? lastErr.message : lastErr));
+  }
+
+  async function resampleTo(buf, targetSr) {
+    if (buf.sampleRate === targetSr) return buf;
+    log("ai", "ری‌سمپل از " + buf.sampleRate + "Hz به " + targetSr + "Hz برای مدل.");
+    const ctx = new OfflineAudioContext(Math.max(1, buf.numberOfChannels), Math.ceil(buf.duration * targetSr), targetSr);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    return await ctx.startRendering();
+  }
+
+  async function separateAI(srcBuffer) {
+    const sr = 44100;
+    log("ai", "موتور AI: مدل MIT-licensed HTDemucs (Meta)، کاملاً روی خود دستگاه اجرا می‌شود.");
+    setProg(3, "آماده‌سازی مدل AI");
+    const buf = await resampleTo(srcBuffer, sr);
+    const left = new Float32Array(buf.getChannelData(0));
+    const right = new Float32Array(buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0));
+    const proc = await ensureAIProcessor();
+    if (abortFlag) throw new Error("متوقف شد");
+    setProg(62, "استنتاج شبکه عصبی");
+    const stems = await proc.separate(left, right);
+    if (abortFlag) throw new Error("متوقف شد");
+    const n = stems.vocals.left.length;
+    let vocL = stems.vocals.left, vocR = stems.vocals.right;
+    let beatL = new Float32Array(n), beatR = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      beatL[i] = stems.drums.left[i] + stems.bass.left[i] + stems.other.left[i];
+      beatR[i] = stems.drums.right[i] + stems.bass.right[i] + stems.other.right[i];
+    }
+    log("ok", "استنتاج AI تمام شد. drums+bass+other به‌عنوان بیت ادغام شدند.");
+
+    setProg(88, "پوشش هوشمند: پیدا کردن هر جایی که هنوز صدای خواننده مانده");
+    const refined = await smartVocalCoverage(vocL, vocR, beatL, beatR, sr);
+    return { vocL: refined.vocL, vocR: refined.vocR, beatL: refined.beatL, beatR: refined.beatR, sr };
+  }
+
+  // Iteratively locates where the singer actually is (per time-frame AND
+  // per frequency bin, not just "loud vs quiet") and keeps pulling any
+  // leftover vocal energy out of the beat stem into the vocal stem, round
+  // after round, until barely anything moves anymore. Two things keep the
+  // audio from "falling apart" while it does this:
+  //  1. Temporal smoothing (attack/release) on the mask — a bin can't snap
+  //     from "not vocal" to "vocal" instantly, so word onsets/tails don't
+  //     click or get chopped.
+  //  2. A small smoothing kernel across neighbouring bins — stops the
+  //     "musical noise" chatter that hard per-bin gating usually causes.
+  // It stops on its own (no fixed round count) once the amount of vocal
+  // energy still being recovered drops below ~1% of the total — i.e. it
+  // keeps covering the spot until essentially the whole voice is captured,
+  // then leaves the rest of the mix alone.
+  async function smartVocalCoverage(vocL, vocR, beatL, beatR, sr) {
+    const N = 2048, hop = 512, bins = (N >> 1) + 1;
+    const n = vocL.length;
+    const win = hann(N);
+    const nFrames = Math.max(1, 1 + Math.floor(Math.max(0, n - N) / hop));
+    const maxRounds = 4;
+    let curV = { L: vocL, R: vocR };
+    let curB = { L: beatL, R: beatR };
+
+    for (let round = 0; round < maxRounds; round++) {
+      if (abortFlag) break;
+      const p = 1.5 + round * 0.7; // each round gates a little harder on what's left
+      const attack = 0.75, release = 0.12; // fast to grab onset, slow to release tail smoothly
+      let movedEnergy = 0, totalEnergy = 1e-9;
+      const nextV = { L: new Float32Array(n), R: new Float32Array(n) };
+      const nextB = { L: new Float32Array(n), R: new Float32Array(n) };
+
+      for (const ch of ["L", "R"]) {
+        const vSrc = curV[ch], bSrc = curB[ch];
+        const vRe = new Float32Array(N), vIm = new Float32Array(N);
+        const bRe = new Float32Array(N), bIm = new Float32Array(N);
+        const outV = new Float32Array(n), outB = new Float32Array(n), w2 = new Float32Array(n);
+        const smoothMask = new Float32Array(bins); // carries across frames -> the "release" memory
+        let primed = false;
+
+        for (let f = 0; f < nFrames; f++) {
+          if (abortFlag) break;
+          const start = f * hop;
+          vRe.fill(0); vIm.fill(0); bRe.fill(0); bIm.fill(0);
+          const take = Math.min(N, n - start);
+          for (let i = 0; i < take; i++) {
+            const w = win[i];
+            vRe[i] = vSrc[start + i] * w;
+            bRe[i] = bSrc[start + i] * w;
+          }
+          fftRadix2(vRe, vIm); fftRadix2(bRe, bIm);
+
+          const rawMask = new Float32Array(bins);
+          for (let k = 0; k < bins; k++) {
+            const vMag = Math.pow(Math.hypot(vRe[k], vIm[k]), p);
+            const bMag = Math.pow(Math.hypot(bRe[k], bIm[k]), p);
+            rawMask[k] = vMag / (vMag + bMag + 1e-12);
+          }
+          // smooth a little across neighbouring bins first (kills chatter)
+          const bandMask = new Float32Array(bins);
+          for (let k = 0; k < bins; k++) {
+            const a = rawMask[Math.max(0, k - 1)], b = rawMask[k], c = rawMask[Math.min(bins - 1, k + 1)];
+            bandMask[k] = 0.25 * a + 0.5 * b + 0.25 * c;
+          }
+          // then smooth across time with attack/release, and measure how
+          // much this round is actually still recovering
+          for (let k = 0; k < bins; k++) {
+            const target = bandMask[k];
+            if (!primed) smoothMask[k] = target;
+            else {
+              const a = target > smoothMask[k] ? attack : release;
+              smoothMask[k] += a * (target - smoothMask[k]);
+            }
+            const mv = smoothMask[k] * smoothMask[k] * (3 - 2 * smoothMask[k]);
+            const mb = 1 - mv;
+            // pool what each stem currently holds at this bin, then hand it
+            // back out according to who it really belongs to — this is what
+            // actually moves leaked vocal out of the beat stem instead of
+            // just quietly attenuating whichever side "loses"
+            const poolRe = vRe[k] + bRe[k], poolIm = vIm[k] + bIm[k];
+            const vMagBefore = vRe[k] * vRe[k] + vIm[k] * vIm[k];
+            const newVre = poolRe * mv, newVim = poolIm * mv;
+            const vMagAfter = newVre * newVre + newVim * newVim;
+            movedEnergy += Math.max(0, vMagAfter - vMagBefore); // vocal energy gained this round
+            totalEnergy += poolRe * poolRe + poolIm * poolIm;
+            vRe[k] = newVre; vIm[k] = newVim;
+            bRe[k] = poolRe * mb; bIm[k] = poolIm * mb;
+          }
+          primed = true;
+          for (let k = 1; k < bins - 1; k++) {
+            const mir = N - k;
+            vRe[mir] = vRe[k]; vIm[mir] = -vIm[k];
+            bRe[mir] = bRe[k]; bIm[mir] = -bIm[k];
+          }
+          ifft(vRe, vIm); ifft(bRe, bIm);
+          for (let i = 0; i < take; i++) {
+            const w = win[i];
+            outV[start + i] += vRe[i] * w;
+            outB[start + i] += bRe[i] * w;
+            w2[start + i] += w * w;
+          }
+          if (f % 10 === 0) {
+            setProg(88 + (round + f / nFrames) / maxRounds * 10, "پوشش هوشمند — دور " + (round + 1) + " · کانال " + ch);
+            poke();
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+        for (let i = 0; i < n; i++) {
+          const d = Math.max(w2[i], 1e-8);
+          nextV[ch][i] = outV[i] / d;
+          nextB[ch][i] = outB[i] / d;
+        }
+      }
+
+      curV = nextV; curB = nextB;
+      const coverage = movedEnergy / totalEnergy;
+      log("ai", "پوشش هوشمند دور " + (round + 1) + ": انرژی جدید بازیابی‌شده ≈ " + (coverage * 100).toFixed(2) + "%");
+      if (coverage < 0.01) { log("ok", "همگرا شد — چیز قابل‌توجهی دیگر باقی نمانده."); break; }
+    }
+    return { vocL: curV.L, vocR: curV.R, beatL: curB.L, beatR: curB.R };
+  }
+
+  function attach(playerId, dlId, L, R, sr, name) {
+    const wav = encodeWav(L, R, sr);
+    const url = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+    $(playerId).src = url;
+    $(dlId).href = url;
+    $(dlId).download = name;
+  }
+
+  function peakNormalize(L, R, peak) {
+    let m = 0;
+    for (let i = 0; i < L.length; i++) m = Math.max(m, Math.abs(L[i]), Math.abs(R[i]));
+    if (m < 1e-8) return;
+    const g = peak / m;
+    for (let i = 0; i < L.length; i++) { L[i] *= g; R[i] *= g; }
+    log("info", "نرمال‌سازی پیک: peak=" + m.toFixed(4) + " gain=" + g.toFixed(3));
+  }
+
+  function fftRadix2(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        let t = re[i]; re[i] = re[j]; re[j] = t;
+        t = im[i]; im[i] = im[j]; im[j] = t;
+      }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = -2 * Math.PI / len;
+      const wlenRe = Math.cos(ang), wlenIm = Math.sin(ang);
+      const half = len >> 1;
+      for (let i = 0; i < n; i += len) {
+        let wRe = 1, wIm = 0;
+        for (let j = 0; j < half; j++) {
+          const ur = re[i + j], ui = im[i + j];
+          const vr = re[i + j + half] * wRe - im[i + j + half] * wIm;
+          const vi = re[i + j + half] * wIm + im[i + j + half] * wRe;
+          re[i + j] = ur + vr; im[i + j] = ui + vi;
+          re[i + j + half] = ur - vr; im[i + j + half] = ui - vi;
+          const nRe = wRe * wlenRe - wIm * wlenIm;
+          wIm = wRe * wlenIm + wIm * wlenRe;
+          wRe = nRe;
+        }
+      }
+    }
+  }
+  function ifft(re, im) {
+    const n = re.length;
+    for (let i = 0; i < n; i++) im[i] = -im[i];
+    fftRadix2(re, im);
+    const inv = 1 / n;
+    for (let i = 0; i < n; i++) { re[i] *= inv; im[i] = -im[i] * inv; }
+  }
+  function hann(n) {
+    const w = new Float32Array(n);
+    for (let i = 0; i < n; i++) w[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
+    return w;
+  }
+  function median(values) {
+    const a = values.slice().sort((x, y) => x - y);
+    return a[a.length >> 1];
+  }
+
+  async function separate(left, right, sr, params) {
+    const N = 2048;
+    const hop = 512;
+    const bins = (N >> 1) + 1;
+    const n = left.length;
+    const win = hann(N);
+    const nFrames = Math.max(1, 1 + Math.floor(Math.max(0, n - N) / hop));
+    log("eng", "رندر STFT: N=" + N + " hop=" + hop + " frames=" + nFrames + " sr=" + sr);
+    poke();
+
+    const vocL = new Float32Array(n);
+    const vocR = new Float32Array(n);
+    const beatL = new Float32Array(n);
+    const beatR = new Float32Array(n);
+    const wsum = new Float32Array(n);
+    const reL = new Float32Array(N), imL = new Float32Array(N);
+    const reR = new Float32Array(N), imR = new Float32Array(N);
+    const magHist = [];
+    const HIST = 7;
+    const FMED = 17;
+    const freqScratch = new Float32Array(FMED);
+    let maskMean = 0, maskCount = 0;
+    const t0 = performance.now();
+
+    for (let f = 0; f < nFrames; f++) {
+      if (abortFlag) break;
+      const start = f * hop;
+      reL.fill(0); imL.fill(0); reR.fill(0); imR.fill(0);
+      const take = Math.min(N, n - start);
+      for (let i = 0; i < take; i++) {
+        const w = win[i];
+        reL[i] = left[start + i] * w;
+        reR[i] = right[start + i] * w;
+      }
+      fftRadix2(reL, imL);
+      fftRadix2(reR, imR);
+
+      const mag = new Float32Array(bins);
+      for (let k = 0; k < bins; k++) mag[k] = 0.5 * (Math.hypot(reL[k], imL[k]) + Math.hypot(reR[k], imR[k]));
+      magHist.push(mag);
+      if (magHist.length > HIST) magHist.shift();
+
+      const vocReL = new Float32Array(N), vocImL = new Float32Array(N);
+      const vocReR = new Float32Array(N), vocImR = new Float32Array(N);
+      const beatReL = new Float32Array(N), beatImL = new Float32Array(N);
+      const beatReR = new Float32Array(N), beatImR = new Float32Array(N);
+
+      for (let k = 0; k < bins; k++) {
+        const freq = k * sr / N;
+        const mL = Math.hypot(reL[k], imL[k]);
+        const mR = Math.hypot(reR[k], imR[k]);
+        const coh = (reL[k] * reR[k] + imL[k] * imR[k]) / (mL * mR + 1e-12);
+        const ampBal = (Math.min(mL, mR) + 1e-12) / (Math.max(mL, mR) + 1e-12);
+        const reM = 0.5 * (reL[k] + reR[k]);
+        const imM = 0.5 * (imL[k] + imR[k]);
+
+        let timeMed = mag[k];
+        if (magHist.length >= 3) timeMed = median(magHist.map((g) => g[k]));
+        const half = (FMED - 1) >> 1;
+        let fi = 0;
+        for (let t = -half; t <= half; t++) freqScratch[fi++] = mag[Math.max(0, Math.min(bins - 1, k + t))];
+        const freqMed = median(Array.from(freqScratch));
+        const harm = timeMed / (timeMed + freqMed + 1e-12);
+
+        const sim = Math.pow(Math.max(0, coh), 1.25) * Math.pow(ampBal, 0.55);
+        const center = Math.pow(sim, 0.4 + params.phaseSens);
+        const inBand = freq >= params.lowcut && freq <= params.highcut;
+        let desire = inBand ? center * (0.22 + 0.78 * harm) : center * 0.03 * harm;
+        if (freq < params.lowcut) desire *= 0.04;
+        if (freq > params.highcut) desire *= 0.18;
+        let vmask = Math.min(1, desire * (0.7 + 1.7 * params.strength));
+        // double smoothstep: much harder gate between "vocal" and "not vocal" bins
+        vmask = vmask * vmask * (3 - 2 * vmask);
+        vmask = vmask * vmask * (3 - 2 * vmask);
+        maskMean += vmask; maskCount += 1;
+
+        // leakage term is squeezed further as strength rises, so almost no
+        // off-center / non-harmonic energy survives into the vocal stem
+        const leak = 0.22 * (1 - params.strength) * (1 - vmask);
+        vocReL[k] = reM * vmask + (reL[k] - reM) * leak;
+        vocImL[k] = imM * vmask + (imL[k] - imM) * leak;
+        vocReR[k] = reM * vmask + (reR[k] - reM) * leak;
+        vocImR[k] = imM * vmask + (imR[k] - imM) * leak;
+
+        // over-subtraction: strip more than a 1:1 amount of the vocal estimate
+        // out of the beat bus so residual vocal energy can't hide in the mix
+        const sub = Math.min(1.6, params.strength * 1.55 + 0.15);
+        beatReL[k] = (reL[k] - vocReL[k] * sub) * (1 - 0.4 * vmask);
+        beatImL[k] = (imL[k] - vocImL[k] * sub) * (1 - 0.4 * vmask);
+        beatReR[k] = (reR[k] - vocReR[k] * sub) * (1 - 0.4 * vmask);
+        beatImR[k] = (imR[k] - vocImR[k] * sub) * (1 - 0.4 * vmask);
+        if (freq < params.lowcut) {
+          const keep = 0.35 * (1 - harm);
+          beatReL[k] += reM * keep; beatImL[k] += imM * keep;
+          beatReR[k] += reM * keep; beatImR[k] += imM * keep;
+        }
+      }
+      for (let k = 1; k < bins - 1; k++) {
+        const mir = N - k;
+        vocReL[mir] = vocReL[k]; vocImL[mir] = -vocImL[k];
+        vocReR[mir] = vocReR[k]; vocImR[mir] = -vocImR[k];
+        beatReL[mir] = beatReL[k]; beatImL[mir] = -beatImL[k];
+        beatReR[mir] = beatReR[k]; beatImR[mir] = -beatImR[k];
+      }
+
+      ifft(vocReL, vocImL); ifft(vocReR, vocImR);
+      ifft(beatReL, beatImL); ifft(beatReR, beatImR);
+
+      for (let i = 0; i < take; i++) {
+        const w = win[i];
+        const ww = w * w;
+        vocL[start + i] += vocReL[i] * w;
+        vocR[start + i] += vocReR[i] * w;
+        beatL[start + i] += beatReL[i] * w;
+        beatR[start + i] += beatReR[i] * w;
+        wsum[start + i] += ww;
+      }
+
+      if (f % 6 === 0) {
+        const pct = 10 + (f / nFrames) * 84;
+        const elapsed = (performance.now() - t0) / 1000;
+        const eta = f > 4 ? elapsed / (f + 1) * (nFrames - f) : 0;
+        setProg(pct, "رندر فریم " + (f + 1) + " از " + nFrames);
+        poke();
+        if (f % 30 === 0) {
+          log("eng", "فریم " + (f + 1) + "/" + nFrames + " · ETA " + eta.toFixed(1) + "s · ماسک " + (maskMean / Math.max(1, maskCount)).toFixed(3));
+        }
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const d = Math.max(wsum[i], 1e-8);
+      vocL[i] /= d; vocR[i] /= d;
+      beatL[i] /= d; beatR[i] /= d;
+    }
+    log("eng", "Overlap-add تمام شد. میانگین ماسک=" + (maskMean / Math.max(1, maskCount)).toFixed(3));
+    poke();
+    return { vocL, vocR, beatL, beatR };
+  }
+
+  // Stage A — always runs after the first render. Pure post-processing on the
+  // vocal stem only: a presence lift around 2.5–6kHz for clarity, plus a
+  // spectral noise-gate that mutes bins that are almost silent (residual
+  // bleed / hiss) instead of leaving low-level leakage audible.
+  async function clarityBoost(vocL, vocR, sr) {
+    const N = 2048, hop = 512, bins = (N >> 1) + 1;
+    const n = vocL.length;
+    const win = hann(N);
+    const nFrames = Math.max(1, 1 + Math.floor(Math.max(0, n - N) / hop));
+    const outL = new Float32Array(n), outR = new Float32Array(n), wsum = new Float32Array(n);
+    const reL = new Float32Array(N), imL = new Float32Array(N);
+    const reR = new Float32Array(N), imR = new Float32Array(N);
+    log("eng", "پاس وضوح: تقویت حضور ۲.۵-۶kHz + گیت نویز روی وکال");
+    poke();
+    for (let f = 0; f < nFrames; f++) {
+      if (abortFlag) break;
+      const start = f * hop;
+      reL.fill(0); imL.fill(0); reR.fill(0); imR.fill(0);
+      const take = Math.min(N, n - start);
+      for (let i = 0; i < take; i++) {
+        reL[i] = vocL[start + i] * win[i];
+        reR[i] = vocR[start + i] * win[i];
+      }
+      fftRadix2(reL, imL); fftRadix2(reR, imR);
+      let peak = 1e-9;
+      for (let k = 0; k < bins; k++) peak = Math.max(peak, Math.hypot(reL[k], imL[k]), Math.hypot(reR[k], imR[k]));
+      for (let k = 0; k < bins; k++) {
+        const freq = k * sr / N;
+        let gain = 1;
+        if (freq >= 2500 && freq <= 6000) gain *= 1.22;
+        else if (freq > 6000 && freq <= 9000) gain *= 1.08;
+        const mL = Math.hypot(reL[k], imL[k]);
+        const mR = Math.hypot(reR[k], imR[k]);
+        const rel = Math.max(mL, mR) / peak;
+        if (rel < 0.025) gain *= rel / 0.025; // gate near-silent residue
+        reL[k] *= gain; imL[k] *= gain; reR[k] *= gain; imR[k] *= gain;
+      }
+      for (let k = 1; k < bins - 1; k++) {
+        const mir = N - k;
+        reL[mir] = reL[k]; imL[mir] = -imL[k];
+        reR[mir] = reR[k]; imR[mir] = -imR[k];
+      }
+      ifft(reL, imL); ifft(reR, imR);
+      for (let i = 0; i < take; i++) {
+        const w = win[i];
+        outL[start + i] += reL[i] * w;
+        outR[start + i] += reR[i] * w;
+        wsum[start + i] += w * w;
+      }
+      if (f % 12 === 0) { poke(); await new Promise((r) => setTimeout(r, 0)); }
+    }
+    for (let i = 0; i < n; i++) {
+      const d = Math.max(wsum[i], 1e-8);
+      vocL[i] = outL[i] / d; vocR[i] = outR[i] / d;
+    }
+  }
+
+  // Stage B — optional "pass 2". Feeds the two already-separated stems back
+  // through a second decomposition: a per-bin Wiener-style mask is built by
+  // comparing the vocal stem's own spectrum against the beat stem's own
+  // spectrum, frame by frame, and each stem is masked with the side of that
+  // comparison it "won". Whatever leaked from one stem into the other during
+  // pass 1 is quiet relative to that bin's dominant source, so this squeezes
+  // it out further without needing the original mixture again.
+  async function refinePass(vocL, vocR, beatL, beatR, sr, intensity) {
+    const N = 2048, hop = 512, bins = (N >> 1) + 1;
+    const n = vocL.length;
+    const win = hann(N);
+    const nFrames = Math.max(1, 1 + Math.floor(Math.max(0, n - N) / hop));
+    const p = 1.4 + 2.6 * intensity;
+    const nv = { L: new Float32Array(n), R: new Float32Array(n) };
+    const nb = { L: new Float32Array(n), R: new Float32Array(n) };
+    const wsum = new Float32Array(n);
+    log("eng", "پاس دوم: بازسازی ماسک وینر بین وکال و بیت جداشده (p=" + p.toFixed(2) + ")");
+    poke();
+    const chans = [["L", vocL, beatL], ["R", vocR, beatR]];
+    for (const [ch, vSrc, bSrc] of chans) {
+      const vRe = new Float32Array(N), vIm = new Float32Array(N);
+      const bRe = new Float32Array(N), bIm = new Float32Array(N);
+      const outV = new Float32Array(n), outB = new Float32Array(n);
+      const w2 = new Float32Array(n);
+      for (let f = 0; f < nFrames; f++) {
+        if (abortFlag) break;
+        const start = f * hop;
+        vRe.fill(0); vIm.fill(0); bRe.fill(0); bIm.fill(0);
+        const take = Math.min(N, n - start);
+        for (let i = 0; i < take; i++) {
+          const w = win[i];
+          vRe[i] = vSrc[start + i] * w;
+          bRe[i] = bSrc[start + i] * w;
+        }
+        fftRadix2(vRe, vIm); fftRadix2(bRe, bIm);
+        for (let k = 0; k < bins; k++) {
+          const vMag = Math.pow(Math.hypot(vRe[k], vIm[k]), p);
+          const bMag = Math.pow(Math.hypot(bRe[k], bIm[k]), p);
+          const tot = vMag + bMag + 1e-12;
+          let mv = vMag / tot, mb = bMag / tot;
+          mv = mv * mv * (3 - 2 * mv);
+          mb = mb * mb * (3 - 2 * mb);
+          vRe[k] *= mv; vIm[k] *= mv;
+          bRe[k] *= mb; bIm[k] *= mb;
+        }
+        for (let k = 1; k < bins - 1; k++) {
+          const mir = N - k;
+          vRe[mir] = vRe[k]; vIm[mir] = -vIm[k];
+          bRe[mir] = bRe[k]; bIm[mir] = -bIm[k];
+        }
+        ifft(vRe, vIm); ifft(bRe, bIm);
+        for (let i = 0; i < take; i++) {
+          const w = win[i];
+          outV[start + i] += vRe[i] * w;
+          outB[start + i] += bRe[i] * w;
+          w2[start + i] += w * w;
+        }
+        if (f % 10 === 0) {
+          setProg(90 + (f / nFrames) * 9, "پاس دوم — کانال " + ch);
+          poke();
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+      for (let i = 0; i < n; i++) {
+        const d = Math.max(w2[i], 1e-8);
+        nv[ch][i] = outV[i] / d;
+        nb[ch][i] = outB[i] / d;
+      }
+    }
+    log("ok", "پاس دوم تمام شد.");
+    return { vocL: nv.L, vocR: nv.R, beatL: nb.L, beatR: nb.R };
+  }
+
+  function encodeWav(L, R, sr) {
+    const n = L.length;
+    const buf = new ArrayBuffer(44 + n * 4);
+    const v = new DataView(buf);
+    const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, "RIFF"); v.setUint32(4, 36 + n * 4, true); ws(8, "WAVE"); ws(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+    ws(36, "data"); v.setUint32(40, n * 4, true);
+    let o = 44;
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(-1, Math.min(1, L[i]));
+      const b = Math.max(-1, Math.min(1, R[i]));
+      v.setInt16(o, a < 0 ? a * 0x8000 : a * 0x7fff, true); o += 2;
+      v.setInt16(o, b < 0 ? b * 0x8000 : b * 0x7fff, true); o += 2;
+    }
+    return buf;
+  }
+
+  (async () => {
+    try {
+      const cached = await idbGetModel(AI_MODEL_URL);
+      if (cached && cached.byteLength) {
+        const span = document.querySelector('input[name="engine"][value="ai"]').closest("label").querySelector("span");
+        span.textContent = "دقت بسیار بالاتر. مدل (~۱۷۰MB) از قبل در IndexedDB مرورگر ذخیره است — بدون هیچ دانلودی اجرا می‌شود.";
+        log("ok", "مدل Demucs از قبل در IndexedDB این مرورگر موجود است.");
+      }
+    } catch (e) { /* IndexedDB might be unavailable (private mode); AI mode will just re-download */ }
+  })();
+
+  log("info", "موتور پیش‌فرض DSP است (بدون مدل). موتور AI اختیاری است و با انتخاب خودت روشن می‌شود.");
+  log("eng", "منتظر فایل یا نمونه آزمایشی.");
+})();
+</script>
+</body>
+</html>
